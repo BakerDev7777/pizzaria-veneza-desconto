@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/((?!assets/|images/|sabores/|fonts/|css/|pushinpay-config\\.js).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
