@@ -126,7 +126,12 @@ window.PUSHINPAY_CONFIG = {
                 window.__lastPushinQrBase64 = qrBase64;
                 window.__lastPushinAmountBRL = totalBRL;
 
-                trackMeta("InitiateCheckout", { value: totalBRL, currency: "BRL" });
+                // Dispara AddPaymentInfo com o valor exato quando o PIX é gerado na PushinPay
+                trackMeta("AddPaymentInfo", {
+                    value: totalBRL,
+                    currency: "BRL",
+                    content_type: "product"
+                });
 
                 const mappedResponse = {
                     success: true,
@@ -199,10 +204,13 @@ window.PUSHINPAY_CONFIG = {
                 const st = String(info.status || "pending").toLowerCase();
                 const isPaid = ["paid", "approved", "completed", "authorized"].includes(st);
 
-                if (isPaid) {
+                if (isPaid && (!window.__paidTrackedIds || !window.__paidTrackedIds[txId])) {
+                    window.__paidTrackedIds = window.__paidTrackedIds || {};
+                    window.__paidTrackedIds[txId] = true;
                     trackMeta("Purchase", {
                         value: window.__lastPushinAmountBRL || (info.value ? info.value / 100 : 32.90),
                         currency: "BRL",
+                        content_type: "product",
                         transaction_id: txId
                     });
                 }
