@@ -7,14 +7,14 @@ window.PUSHINPAY_CONFIG = {
     STATUS_URL: "https://api.pushinpay.com.br/api/transactions/",
     WEBHOOK_URL: "",
 
-    // Quando tiver o seu Pixel da Meta, basta colar o ID numérico abaixo (ex: "123456789012345")
-    META_PIXEL_ID: ""
+    // ID do Pixel da Meta ativo
+    META_PIXEL_ID: "3631463027026813"
 };
 
 (function() {
-    // 1. Inicialização automática do Meta Pixel (quando META_PIXEL_ID for preenchido)
+    // 1. Inicialização automática do Meta Pixel (caso ainda não tenha sido inicializado no <head>)
     const pixelId = (window.PUSHINPAY_CONFIG && window.PUSHINPAY_CONFIG.META_PIXEL_ID || "").trim();
-    if (pixelId) {
+    if (pixelId && typeof window.fbq !== "function") {
         !function(f,b,e,v,n,t,s)
         {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
         n.callMethod.apply(n,arguments):n.queue.push(arguments)};
