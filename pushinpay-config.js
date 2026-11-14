@@ -1,14 +1,58 @@
 // ============================================================
-// INTEGRAÇÃO OFICIAL PUSHINPAY - PIZZARIA VENEZA
+// CONFIGURAÇÃO PUSHINPAY + OTIMIZAÇÃO META ADS (PIZZARIA VENEZA)
 // ============================================================
 window.PUSHINPAY_CONFIG = {
     API_TOKEN: "73737|AJFfZC71a2HKoNQHd5E3qXus9p1wgrQsLwAvpDkZ65b05551",
     API_URL: "https://api.pushinpay.com.br/api/pix/cashIn",
     STATUS_URL: "https://api.pushinpay.com.br/api/transactions/",
-    WEBHOOK_URL: ""
+    WEBHOOK_URL: "",
+
+    // Quando tiver o seu Pixel da Meta, basta colar o ID numérico abaixo (ex: "123456789012345")
+    META_PIXEL_ID: ""
 };
 
 (function() {
+    // 1. Inicialização automática do Meta Pixel (quando META_PIXEL_ID for preenchido)
+    const pixelId = (window.PUSHINPAY_CONFIG && window.PUSHINPAY_CONFIG.META_PIXEL_ID || "").trim();
+    if (pixelId) {
+        !function(f,b,e,v,n,t,s)
+        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}(window, document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+        window.fbq('init', pixelId);
+        window.fbq('track', 'PageView');
+    }
+
+    function trackMeta(eventName, params) {
+        try {
+            if (typeof window.fbq === "function") {
+                window.fbq("track", eventName, params || {});
+            }
+        } catch (e) {}
+    }
+
+    // Monitora mudanças de rota SPA para disparar ViewContent / AddToCart / InitiateCheckout no Meta Ads
+    let lastTrackedPath = "";
+    function checkRouteEvents() {
+        const p = window.location.pathname;
+        if (p === lastTrackedPath) return;
+        lastTrackedPath = p;
+        if (p.startsWith("/product/")) {
+            trackMeta("ViewContent", { content_type: "product", currency: "BRL" });
+        } else if (p === "/cart") {
+            trackMeta("AddToCart", { currency: "BRL" });
+        } else if (p === "/checkout") {
+            trackMeta("InitiateCheckout", { currency: "BRL" });
+        }
+    }
+    window.addEventListener("popstate", checkRouteEvents);
+    setInterval(checkRouteEvents, 800);
+
+    // 2. Interceptador de Fetch (PushinPay PIX + Bloqueio de Telemetria Antiga)
     const originalFetch = window.fetch.bind(window);
 
     function parseBRLPrice(strOrNum) {
@@ -22,7 +66,7 @@ window.PUSHINPAY_CONFIG = {
     window.fetch = async function(input, init) {
         const url = typeof input === "string" ? input : (input && input.url ? input.url : "");
 
-        // 1. Intercepta criação de PIX (/functions/v1/get-payment) -> PushinPay POST /api/pix/cashIn
+        // A) Cria cobrança PIX na PushinPay (/functions/v1/get-payment)
         if (url.includes("/functions/v1/get-payment")) {
             try {
                 let bodyObj = {};
@@ -30,7 +74,6 @@ window.PUSHINPAY_CONFIG = {
                     bodyObj = typeof init.body === "string" ? JSON.parse(init.body) : init.body;
                 }
 
-                // Calcula o valor total do carrinho (cart: [{nome, preco: "32,90", quantidade: 1}, ...])
                 let totalBRL = 0;
                 if (Array.isArray(bodyObj.cart)) {
                     bodyObj.cart.forEach(item => {
@@ -76,7 +119,14 @@ window.PUSHINPAY_CONFIG = {
                 const pData = await res.json();
                 const txId = pData.id || ("pp_" + Date.now());
                 const emvCode = (pData.qr_code || "").trim();
-                const qrBase64 = pData.qr_code_base64 || "";
+                const qrBase64 = pData.qr_code_base64
+                    ? (pData.qr_code_base64.startsWith("data:image") ? pData.qr_code_base64 : "data:image/png;base64," + pData.qr_code_base64)
+                    : "";
+
+                window.__lastPushinQrBase64 = qrBase64;
+                window.__lastPushinAmountBRL = totalBRL;
+
+                trackMeta("InitiateCheckout", { value: totalBRL, currency: "BRL" });
 
                 const mappedResponse = {
                     success: true,
@@ -106,7 +156,7 @@ window.PUSHINPAY_CONFIG = {
                     headers: { "Content-Type": "application/json" }
                 });
             } catch (err) {
-                console.error("Erro PushinPay Interceptor:", err);
+                console.error("Erro PushinPay:", err);
                 return new Response(JSON.stringify({
                     success: false,
                     message: err.message || "Erro ao conectar com a PushinPay"
@@ -114,7 +164,7 @@ window.PUSHINPAY_CONFIG = {
             }
         }
 
-        // 2. Intercepta consulta de status do PIX (/functions/v1/verify-payment?id=...) -> PushinPay GET /api/transactions/{id}
+        // B) Consulta status do PIX na PushinPay (/functions/v1/verify-payment)
         if (url.includes("/functions/v1/verify-payment")) {
             try {
                 const parsedUrl = new URL(url, window.location.origin);
@@ -149,6 +199,14 @@ window.PUSHINPAY_CONFIG = {
                 const st = String(info.status || "pending").toLowerCase();
                 const isPaid = ["paid", "approved", "completed", "authorized"].includes(st);
 
+                if (isPaid) {
+                    trackMeta("Purchase", {
+                        value: window.__lastPushinAmountBRL || (info.value ? info.value / 100 : 32.90),
+                        currency: "BRL",
+                        transaction_id: txId
+                    });
+                }
+
                 return new Response(JSON.stringify({
                     success: isPaid,
                     status: isPaid ? "paid" : st
@@ -162,6 +220,14 @@ window.PUSHINPAY_CONFIG = {
                     headers: { "Content-Type": "application/json" }
                 });
             }
+        }
+
+        // C) Bloqueia qualquer vazamento de telemetria/sessão para o Supabase antigo do outro anunciante
+        if (url.includes("iwjltiyaqmtlnylddgru.supabase.co")) {
+            return new Response(JSON.stringify({ ok: true, data: [] }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
         }
 
         return originalFetch(input, init);
