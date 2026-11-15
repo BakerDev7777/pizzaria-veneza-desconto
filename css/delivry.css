@@ -2027,3 +2027,18 @@ input::placeholder {
   padding: 10px;
   border-bottom: 1px solid #ddd;
 }
+
+.pfs-flavor-price.is-extra {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-top: 3px;
+}
+
