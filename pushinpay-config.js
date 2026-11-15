@@ -402,6 +402,100 @@ window.PUSHINPAY_CONFIG = {
     // 4. INTERCEPTADOR DE FETCH (PUSHINPAY PIX + VERIFICAÇÃO + PURCHASE IMEDIATO)
     // ============================================================
     const originalFetch = window.fetch.bind(window);
+    let inFlightGeoPromise = null;
+
+    function getCachedGeoData() {
+        try {
+            const raw = localStorage.getItem("lf_geo_v1") || sessionStorage.getItem("lf_geo_v1");
+            const parsed = safeJsonParse(raw, null);
+            if (parsed && typeof parsed === "object" && (parsed.city || parsed.uf || parsed.region)) {
+                if (parsed.ip && !window.__cachedClientIp) {
+                    window.__cachedClientIp = parsed.ip;
+                }
+                return parsed;
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    function persistGeoData(geoObj) {
+        if (!geoObj || typeof geoObj !== "object") return;
+        try {
+            const serialized = JSON.stringify(geoObj);
+            nativeSetItem.call(localStorage, "lf_geo_v1", serialized);
+            nativeSetItem.call(sessionStorage, "lf_geo_v1", serialized);
+        } catch (e) {}
+    }
+
+    async function resolveGeoDataFast() {
+        const cached = getCachedGeoData();
+        if (cached) {
+            if (cached.city || cached.uf) {
+                syncAdvancedMatching({ city: cached.city, state: cached.uf });
+            }
+            return cached;
+        }
+
+        if (inFlightGeoPromise) {
+            return inFlightGeoPromise;
+        }
+
+        inFlightGeoPromise = (async () => {
+            const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+            const timeoutId = controller ? setTimeout(() => controller.abort(), 1500) : null;
+            try {
+                const res = await originalFetch("https://get.geojs.io/v1/ip/geo.json", {
+                    method: "GET",
+                    signal: controller ? controller.signal : undefined
+                });
+                if (timeoutId) clearTimeout(timeoutId);
+                if (!res.ok) {
+                    return { city: "", region: "", region_code: "", uf: "" };
+                }
+                const data = await res.json();
+                if (data && data.ip) {
+                    window.__cachedClientIp = String(data.ip).trim();
+                }
+                const city = String((data && data.city) || "").trim();
+                const region = String((data && data.region) || "").trim();
+                const rawUf = String((data && (data.region_code || data.uf || data.region)) || "").trim().toUpperCase();
+                const uf = rawUf.length === 2 ? rawUf : "";
+
+                const normalized = {
+                    ip: window.__cachedClientIp || "",
+                    city: city,
+                    region: region || uf,
+                    region_code: uf || region,
+                    uf: uf
+                };
+
+                if (city || uf || region) {
+                    persistGeoData(normalized);
+                }
+                if (city || uf) {
+                    syncAdvancedMatching({ city: city, state: uf });
+                }
+                return normalized;
+            } catch (e) {
+                if (timeoutId) clearTimeout(timeoutId);
+                return { city: "", region: "", region_code: "", uf: "" };
+            } finally {
+                inFlightGeoPromise = null;
+            }
+        })();
+
+        return inFlightGeoPromise;
+    }
+
+    // Pré-carrega ou sincroniza geolocalização em cache para o Advanced Matching logo na inicialização
+    (function preloadGeoForAM() {
+        try {
+            const cached = getCachedGeoData();
+            if (cached && (cached.city || cached.uf)) {
+                syncAdvancedMatching({ city: cached.city, state: cached.uf });
+            }
+        } catch (e) {}
+    })();
 
     async function verifyPushinPayTransaction(txId) {
         if (!txId) return { success: false, status: "pending" };
@@ -464,6 +558,30 @@ window.PUSHINPAY_CONFIG = {
 
     window.fetch = async function(input, init) {
         const url = typeof input === "string" ? input : (input && input.url ? input.url : "");
+
+        // Item 2: Resposta instantânea e não-bloqueante (<1ms) para api.ipify.org
+        if (url.includes("api.ipify.org")) {
+            return new Response(JSON.stringify({ ip: window.__cachedClientIp || "127.0.0.1" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+
+        // Item 3: Interceptador de geolocalização rápido, com cache e à prova de rate-limit (ipapi.co & get.geojs.io)
+        if (url.includes("ipapi.co/json") || url.includes("get.geojs.io/v1/ip/geo.json")) {
+            const cachedGeo = getCachedGeoData();
+            if (cachedGeo) {
+                return new Response(JSON.stringify(cachedGeo), {
+                    status: 200,
+                    headers: { "Content-Type": "application/json" }
+                });
+            }
+            const resolvedGeo = await resolveGeoDataFast();
+            return new Response(JSON.stringify(resolvedGeo || { city: "", region: "", uf: "" }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
 
         // Intercepta consulta ViaCEP para já enriquecer cidade/UF no Advanced Matching
         if (url.includes("viacep.com.br/ws/")) {
