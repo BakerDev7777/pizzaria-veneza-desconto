@@ -43,7 +43,7 @@
     t.src=v;s=b.getElementsByTagName(e)[0];
     s.parentNode.insertBefore(t,s)}(window, document,'script',
     'https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', '3631463027026813');
+    try{fbq('init','3631463027026813',JSON.parse(localStorage.getItem('__meta_am')||'{}'));}catch(_e){fbq('init','3631463027026813');}
     fbq('track', 'PageView');
     </script>
     <noscript><img height="1" width="1" style="display:none"
