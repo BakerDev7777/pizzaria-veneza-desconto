@@ -8,7 +8,7 @@ window.PUSHINPAY_CONFIG = {
     WEBHOOK_URL: "",
 
     // ID do Pixel da Meta ativo
-    META_PIXEL_ID: "3631463027026813"
+    META_PIXEL_ID: "1142142634873198"
 };
 
 (function() {
