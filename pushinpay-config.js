@@ -2,7 +2,7 @@
 // CONFIGURAÇÃO PUSHINPAY + OTIMIZAÇÃO META ADS (PIZZARIA VENEZA)
 // ============================================================
 window.PUSHINPAY_CONFIG = {
-    API_TOKEN: "73737|AJFfZC71a2HKoNQHd5E3qXus9p1wgrQsLwAvpDkZ65b05551",
+    API_TOKEN: "74394|l6yadS65RqujIdGO3qFgEhqek9TsYZVRqFOIWLyNaf6d4000",
     API_URL: "https://api.pushinpay.com.br/api/pix/cashIn",
     STATUS_URL: "https://api.pushinpay.com.br/api/transactions/",
     WEBHOOK_URL: "",
