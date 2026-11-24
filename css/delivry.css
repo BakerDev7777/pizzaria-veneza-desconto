@@ -2042,3 +2042,111 @@ input::placeholder {
   margin-top: 3px;
 }
 
+@keyframes pi-btn-pulse {
+  0%, 100% {
+    box-shadow: 0 4px 14px rgba(7, 124, 34, 0.35), 0 0 0 0 rgba(7, 124, 34, 0.3);
+  }
+  50% {
+    box-shadow: 0 6px 18px rgba(7, 124, 34, 0.45), 0 0 0 6px rgba(7, 124, 34, 0);
+  }
+}
+
+.payment-ifood .pi-code-box {
+  background: #f4fbf6;
+  border: 1.5px dashed #077c22;
+  color: #2d4a35;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.payment-ifood .pi-code-box:hover {
+  background: #eaf7ee;
+  border-color: #055f19;
+}
+
+.payment-ifood .pi-code-icon {
+  color: #077c22;
+}
+
+.payment-ifood .pi-code-icon:hover {
+  background: rgba(7, 124, 34, 0.08);
+}
+
+.payment-ifood .pi-copy-btn {
+  width: 100%;
+  min-height: 52px;
+  background: #077c22 !important;
+  color: #fff !important;
+  border: none;
+  border-radius: 12px;
+  padding: 15px 18px;
+  font-size: 15.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 14px rgba(7, 124, 34, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  animation: pi-btn-pulse 2s infinite;
+}
+
+.payment-ifood .pi-copy-btn:hover {
+  background: #06661c !important;
+  box-shadow: 0 6px 18px rgba(7, 124, 34, 0.45);
+  transform: translateY(-1px);
+}
+
+.payment-ifood .pi-copy-btn.copied {
+  background: #055a18 !important;
+  box-shadow: 0 4px 12px rgba(5, 90, 24, 0.25);
+  animation: none;
+}
+
+.payment-ifood .pi-steps-box {
+  background: #f8faf9;
+  border: 1px solid #d1e7d7;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 0 0 18px;
+}
+
+.payment-ifood .pi-steps-box .pi-howto-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #077c22;
+  margin: 0 0 10px;
+}
+
+.payment-ifood .pi-steps-box .pi-howto-list {
+  gap: 9px;
+}
+
+.payment-ifood .pi-steps-box .pi-howto-list li {
+  font-size: 13px;
+  color: #2d3748;
+  line-height: 1.4;
+  gap: 10px;
+}
+
+.payment-ifood .pi-steps-box .pi-howto-num {
+  width: 22px;
+  height: 22px;
+  background: #077c22;
+  color: #fff;
+  font-size: 11.5px;
+  margin-top: 1px;
+}
+
+.payment-ifood .pi-qr-label {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  margin: 4px auto 10px;
+}
+
+
