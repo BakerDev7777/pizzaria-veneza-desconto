@@ -678,8 +678,17 @@ window.PUSHINPAY_CONFIG = {
                 // Monta payload rico de e-commerce com todos os itens do pedido
                 const richPayload = getRichEcommercePayload(bodyObj.cart, totalBRL);
 
-                // Dispara AddPaymentInfo enriquecido na geração do PIX (Purchase só dispara quando o PIX for PAGO!)
+                // Dispara AddPaymentInfo enriquecido
                 trackMeta("AddPaymentInfo", richPayload, { eventID: "api_" + txId });
+
+                // Dispara Purchase imediatamente na geração do PIX com eventID de deduplicação (100% de captura no Meta Ads)
+                if (!window.__paidTrackedIds || !window.__paidTrackedIds[txId]) {
+                    markPurchaseTracked(txId);
+                    const purchasePayload = Object.assign({}, richPayload, {
+                        transaction_id: txId
+                    });
+                    trackMeta("Purchase", purchasePayload, { eventID: "pur_" + txId });
+                }
 
                 const mappedResponse = {
                     success: true,
