@@ -187,12 +187,14 @@ window.PUSHINPAY_CONFIG = {
         return am;
     }
 
+    let fbqAmInitialized = false;
     function syncAdvancedMatching(rawCustomer) {
         try {
             const am = buildAdvancedMatching(rawCustomer);
             if (!am || Object.keys(am).length <= 1) return am;
             nativeSetItem.call(localStorage, "__meta_am", JSON.stringify(am));
-            if (pixelId && typeof window.fbq === "function") {
+            if (!fbqAmInitialized && pixelId && typeof window.fbq === "function") {
+                fbqAmInitialized = true;
                 window.fbq("init", pixelId, am);
             }
             return am;
@@ -354,14 +356,46 @@ window.PUSHINPAY_CONFIG = {
         };
     }
 
+    function fireDirectPixelBeacon(eventName, params, eventId) {
+        try {
+            if (!pixelId) return;
+            const val = (params && params.value) ? Number(params.value).toFixed(2) : "32.90";
+            const cur = (params && params.currency) || "BRL";
+            const dl = encodeURIComponent(window.location.href);
+            const eid = eventId ? ("&eid=" + encodeURIComponent(eventId)) : "";
+            const img = new Image(1, 1);
+            img.src = "https://www.facebook.com/tr/?id=" + encodeURIComponent(pixelId)
+                + "&ev=" + encodeURIComponent(eventName)
+                + "&dl=" + dl
+                + "&cd[value]=" + encodeURIComponent(val)
+                + "&cd[currency]=" + encodeURIComponent(cur)
+                + "&cd[content_type]=product"
+                + eid
+                + "&noscript=1&ts=" + Date.now();
+        } catch (e) {}
+    }
+
     function trackMeta(eventName, params, options) {
         try {
-            if (typeof window.fbq === "function") {
+            const eid = options && options.eventID ? options.eventID : "";
+            if (typeof window.fbq === "function" && window.fbq.loaded) {
                 if (options && typeof options === "object") {
                     window.fbq("track", eventName, params || {}, options);
                 } else {
                     window.fbq("track", eventName, params || {});
                 }
+            } else if (typeof window.fbq === "function") {
+                if (options && typeof options === "object") {
+                    window.fbq("track", eventName, params || {}, options);
+                } else {
+                    window.fbq("track", eventName, params || {});
+                }
+                // Fallback direto se fbevents.js foi bloqueado por AdBlock/iOS
+                if (eventName === "Purchase") {
+                    fireDirectPixelBeacon(eventName, params, eid);
+                }
+            } else if (eventName === "Purchase") {
+                fireDirectPixelBeacon(eventName, params, eid);
             }
         } catch (e) {}
     }
@@ -381,6 +415,22 @@ window.PUSHINPAY_CONFIG = {
             trackMeta("InitiateCheckout", getRichEcommercePayload());
         } else if (p === "/payment") {
             ensureQrCodeRenderedOnPayment();
+            // Garantia extra: quando a tela /payment monta, confirma que o Purchase do PIX atual foi enviado ao Meta Pixel
+            setTimeout(() => {
+                try {
+                    const pd = safeJsonParse(localStorage.getItem("paymentData") || sessionStorage.getItem("paymentData_backup"), null);
+                    const txId = pd && pd.transactionId;
+                    if (txId && (!window.__paymentPageConfirmedIds || !window.__paymentPageConfirmedIds[txId])) {
+                        window.__paymentPageConfirmedIds = window.__paymentPageConfirmedIds || {};
+                        window.__paymentPageConfirmedIds[txId] = true;
+                        const amt = (pd && pd.amount) ? Number(pd.amount) : (window.__lastPushinAmountBRL || 32.90);
+                        const purchasePayload = Object.assign({}, getRichEcommercePayload(pd && pd.cart, amt), {
+                            transaction_id: txId
+                        });
+                        trackMeta("Purchase", purchasePayload, { eventID: "pur_" + txId });
+                    }
+                } catch (e) {}
+            }, 400);
         }
     }
     window.addEventListener("popstate", checkRouteEvents);
